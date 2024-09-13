@@ -1,19 +1,28 @@
+struct Task {
+    unsigned long lastRunTime;  // Last time the task was run
+    unsigned long interval;     // Interval at which to run the task
+    void (*taskFunction)();     // Pointer to the function to be executed
+};
+
 //global variables
 int ledHeartbeat = LED_BUILTIN;
-int HEARTBEAT_INTERVAL = 500;  //Blink on for 500 milliseconds
-int ADC_READ_INTERVAL = 1000;  
 int adcInputPin = A0;
+boolean BlinkOn = false;
 
-//Global task information
-enum taskNumbers {
-  tnHeartbeatTask,
-  tnAdcReadTask,
-  tnNumberOfTasks, 
+// Function prototypes
+void heartbeatTask();
+void adcReadTask();
+
+// Task array
+Task tasks[] = 
+{
+    {0, 500, heartbeatTask},    // Heartbeat task with 500ms interval
+    {0, 1000, adcReadTask}      // ADC read task with 1000ms interval
 };
-unsigned long taskTime[tnNumberOfTasks];
+
+const int numberOfTasks = sizeof(tasks) / sizeof(tasks[0]);
 
 void setup() {
-  // put your setup code here, to run once:
   //Set up serial port
   Serial.begin(115200);
   delay(3000);
@@ -22,36 +31,45 @@ void setup() {
   // initialize the LED pin as an output.
   pinMode(ledHeartbeat, OUTPUT);
 
-  //Set timers to current time.
-  taskTime[tnHeartbeatTask] = millis();
-  taskTime[tnAdcReadTask] = millis();
-
+  // Set initial task times to current time
+  unsigned long currentTime = millis();
+  for (int i = 0; i < numberOfTasks; i++) 
+  {
+    tasks[i].lastRunTime = currentTime;
+  }
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  unsigned long timeNow = 0;
-  static boolean BlinkOn;
+  unsigned long currentTime = millis();
+
   int sensorValue = 0;
   float percentValue;
 
-  timeNow = millis();
 
-  //Blink a heartbeat LED so we know we're operating.
-  if (timeNow > taskTime[tnHeartbeatTask] + HEARTBEAT_INTERVAL)
+  // Iterate through tasks
+  for (int i = 0; i < numberOfTasks; i++) 
   {
-      taskTime[tnHeartbeatTask] += HEARTBEAT_INTERVAL;
-      digitalWrite (ledHeartbeat, BlinkOn);
-      BlinkOn = !BlinkOn;
+    if (currentTime - tasks[i].lastRunTime >= tasks[i].interval) 
+    {
+        tasks[i].lastRunTime = currentTime;  // Update last run time
+        tasks[i].taskFunction();             // Execute the task function
+    }
   }
-
-  if (timeNow > taskTime[tnAdcReadTask] + ADC_READ_INTERVAL)
-  {
-      //Read from the sensor
-      taskTime[tnAdcReadTask] += ADC_READ_INTERVAL;
-      sensorValue = analogRead(adcInputPin);
-      percentValue = (float)sensorValue/4095.0*100.0;
-      Serial.println("timeNow = " + String(timeNow/1000) + ", sensorValue  = " + String(percentValue) + "%");
-  }
-
 }
+
+// Task functions
+
+void heartbeatTask() 
+{
+    digitalWrite (ledHeartbeat, BlinkOn);
+    BlinkOn = !BlinkOn;
+}
+
+void adcReadTask() 
+{
+    int sensorValue = analogRead(adcInputPin);
+    float percentValue = (float)sensorValue / 4095.0 * 100.0;
+    Serial.println("Sensor Value = " + String(percentValue) + "%");
+}
+
